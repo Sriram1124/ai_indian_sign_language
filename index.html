@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Real‑Time ISL Sign Recognition</title>
+  <style>
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --dark: #1f2937;
+      --light: #f9fafb;
+      --bg: #f3f4f6;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--dark);
+      line-height: 1.6;
+      padding: 0;
+      overflow-x: hidden;
+      transition: background-color 0.3s ease;
+    }
+    
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+      width: 100%;
+      position: relative;
+    }
+    
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      color: var(--primary-dark);
+      position: relative;
+      display: inline-block;
+    }
+    
+    h1::after {
+      content: '';
+      position: absolute;
+      bottom: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80px;
+      height: 4px;
+      background-color: var(--primary);
+      border-radius: 2px;
+    }
+    
+    .subtitle {
+      color: #6b7280;
+      font-size: 1.1rem;
+      max-width: 600px;
+      margin: 1rem auto;
+    }
+    
+    .video-container {
+      position: relative;
+      margin: 2rem 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .video-wrapper {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .video-wrapper:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+    }
+    
+    video, #output {
+      display: block;
+      border-radius: 12px;
+      width: 480px;
+      height: 360px;
+      object-fit: cover;
+      border: none;
+      background-color: #000;
+    }
+    
+    #output {
+      display: none;
+      animation: fadeIn 0.5s ease;
+    }
+    
+    .controls {
+      display: flex;
+      margin-top: 1.5rem;
+      gap: 1rem;
+    }
+    
+    button {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      background-color: var(--primary);
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    button:hover {
+      background-color: var(--primary-dark);
+      transform: translateY(-2px);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    button.secondary {
+      background-color: #e5e7eb;
+      color: var(--dark);
+    }
+    
+    button.secondary:hover {
+      background-color: #d1d5db;
+    }
+    
+    .prediction-container {
+      margin-top: 2rem;
+      min-height: 120px;
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    #prediction {
+      font-size: 2rem;
+      font-weight: 700;
+      padding: 1rem 2rem;
+      border-radius: 12px;
+      background-color: white;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      transition: all 0.3s ease;
+      min-width: 300px;
+      text-align: center;
+    }
+    
+    .status {
+      margin-top: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      color: #6b7280;
+    }
+    
+    .status-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background-color: #d1d5db;
+    }
+    
+    .status-indicator.active {
+      background-color: var(--success);
+      animation: pulse 1.5s infinite;
+    }
+    
+    .status-indicator.error {
+      background-color: var(--danger);
+    }
+    
+    .mode-toggle {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: none;
+      border: none;
+      color: var(--dark);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+    }
+    
+    .history {
+      margin-top: 2rem;
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    
+    .history-item {
+      width: 60px;
+      height: 60px;
+      border-radius: 8px;
+      background-color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      opacity: 0;
+      transform: translateY(20px);
+      animation: slideUp 0.3s forwards;
+    }
+    
+    .history-item.current {
+      background-color: var(--primary);
+      color: white;
+      transform: scale(1.1);
+    }
+    
+    .instructions {
+      margin-top: 3rem;
+      padding: 1.5rem;
+      background-color: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      max-width: 480px;
+      text-align: left;
+    }
+    
+    .instructions h2 {
+      margin-bottom: 1rem;
+      color: var(--primary-dark);
+      font-size: 1.3rem;
+    }
+    
+    .instructions ol {
+      padding-left: 1.5rem;
+    }
+    
+    .instructions li {
+      margin-bottom: 0.5rem;
+    }
+    
+    .dark-mode {
+      background-color: #1a1a2e;
+      color: var(--light);
+    }
+    
+    .dark-mode .subtitle {
+      color: #a1a1aa;
+    }
+    
+    .dark-mode #prediction,
+    .dark-mode .instructions,
+    .dark-mode .history-item {
+      background-color: #252542;
+      color: var(--light);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    
+    .dark-mode button.secondary {
+      background-color: #374151;
+      color: var(--light);
+    }
+    
+    .dark-mode .mode-toggle {
+      color: var(--light);
+    }
+    
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 0.5rem;
+    }
+    
+    .tooltip {
+      position: relative;
+      display: inline-block;
+    }
+    
+    .tooltip .tooltip-text {
+      visibility: hidden;
+      width: 120px;
+      background-color: #333;
+      color: #fff;
+      text-align: center;
+      border-radius: 6px;
+      padding: 5px;
+      position: absolute;
+      z-index: 1;
+      bottom: 125%;
+      left: 50%;
+      transform: translateX(-50%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    
+    .tooltip:hover .tooltip-text {
+      visibility: visible;
+      opacity: 1;
+    }
+    
+    .error-message {
+      padding: 0.75rem 1rem;
+      background-color: #fef2f2;
+      border-left: 4px solid var(--danger);
+      color: #991b1b;
+      margin-top: 1rem;
+      border-radius: 4px;
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      }
+      70% {
+        box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+      }
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes slideUp {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    
+    @media (max-width: 768px) {
+      video, #output {
+        width: 100%;
+        height: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <button class="mode-toggle" id="darkModeToggle">
+        <span id="modeIcon">🌙</span>
+        <span id="modeText">Dark Mode</span>
+      </button>
+      <h1>Real‑Time ISL Sign Recognition</h1>
+      <p class="subtitle">Use your webcam to recognize Indian Sign Language gestures in real-time using machine learning</p>
+    </header>
+    
+    <div class="video-container">
+      <div class="video-wrapper">
+        <video id="video" width="480" height="360" autoplay muted></video>
+        <img id="output" width="480" height="360" alt="Processed frame">
+      </div>
+      <div class="controls">
+        <button id="startBtn" class="primary">
+          <span id="btnIcon">▶️</span>
+          <span id="btnText">Start Recognition</span>
+        </button>
+        <button id="switchViewBtn" class="secondary">Toggle View</button>
+      </div>
+      <div class="error-message" id="errorMsg"></div>
+    </div>
+    
+    <div class="prediction-container">
+      <div id="prediction">Waiting to start...</div>
+      <div class="status">
+        <div class="status-indicator" id="statusIndicator"></div>
+        <span id="statusText">Webcam not active</span>
+      </div>
+    </div>
+    
+    <div class="history" id="history"></div>
+    
+    <div class="instructions">
+      <h2>How to Use</h2>
+      <ol>
+        <li>Press "Start Recognition" to activate your webcam</li>
+        <li>Position your hand clearly in the frame</li>
+        <li>Make ISL gestures in a well-lit environment</li>
+        <li>View real-time predictions below the video feed</li>
+        <li>Toggle between raw and processed views with the "Toggle View" button</li>
+      </ol>
+    </div>
+  </div>
+  
+  <canvas id="capture" width="480" height="360" style="display:none;"></canvas>
+  
+  <script>
+    // DOM Elements
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('capture');
+    const output = document.getElementById('output');
+    const predDiv = document.getElementById('prediction');
+    const startBtn = document.getElementById('startBtn');
+    const switchViewBtn = document.getElementById('switchViewBtn');
+    const statusIndicator = document.getElementById('statusIndicator');
+    const statusText = document.getElementById('statusText');
+    const errorMsg = document.getElementById('errorMsg');
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    const modeIcon = document.getElementById('modeIcon');
+    const modeText = document.getElementById('modeText');
+    const historyContainer = document.getElementById('history');
+    const btnIcon = document.getElementById('btnIcon');
+    const btnText = document.getElementById('btnText');
+    
+    // Context
+    const ctx = canvas.getContext('2d');
+    
+    // App State
+    const state = {
+      isRunning: false,
+      viewMode: 'raw', // 'raw' or 'processed'
+      isDarkMode: false,
+      predictionHistory: [],
+      connectionAttempts: 0,
+      maxAttempts: 3,
+      predictionConfidence: 0,
+      recognitionInterval: null,
+      lastPrediction: '',
+      serverUrl: 'http://localhost:5000/predict',
+      errorTimeout: null
+    };
+    
+    // Initialize the application
+    function init() {
+      attachEventListeners();
+      checkDarkModePreference();
+      createEmptyHistory();
+    }
+    
+    function attachEventListeners() {
+      startBtn.addEventListener('click', toggleRecognition);
+      switchViewBtn.addEventListener('click', toggleView);
+      darkModeToggle.addEventListener('click', toggleDarkMode);
+      
+      video.addEventListener('playing', () => {
+        statusIndicator.classList.add('active');
+        statusText.textContent = 'Webcam active';
+      });
+      
+      // Handle visibility change (tab switching)
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden && state.isRunning) {
+          pauseRecognition();
+        } else if (!document.hidden && state.isRunning) {
+          resumeRecognition();
+        }
+      });
+    }
+    
+    // Start/stop webcam and recognition
+    function toggleRecognition() {
+      if (state.isRunning) {
+        stopRecognition();
+      } else {
+        startRecognition();
+      }
+    }
+    
+    async function startRecognition() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        state.isRunning = true;
+        updateButtonState();
+        
+        // Start recognition loop
+        state.recognitionInterval = setInterval(sendFrame, 500);
+        
+        // Add starting animation
+        predDiv.style.animation = 'bounce 1s ease';
+        setTimeout(() => {
+          predDiv.style.animation = '';
+        }, 1000);
+        
+      } catch (err) {
+        showError(`Cannot access webcam: ${err.message}`);
+        console.error('Webcam error:', err);
+      }
+    }
+    
+    function stopRecognition() {
+      if (video.srcObject) {
+        const tracks = video.srcObject.getTracks();
+        tracks.forEach(track => track.stop());
+        video.srcObject = null;
+      }
+      
+      clearInterval(state.recognitionInterval);
+      state.isRunning = false;
+      updateButtonState();
+      
+      statusIndicator.classList.remove('active');
+      statusText.textContent = 'Webcam not active';
+      predDiv.textContent = 'Waiting to start...';
+    }
+    
+    function pauseRecognition() {
+      clearInterval(state.recognitionInterval);
+      statusText.textContent = 'Recognition paused';
+      statusIndicator.classList.remove('active');
+    }
+    
+    function resumeRecognition() {
+      state.recognitionInterval = setInterval(sendFrame, 500);
+      statusIndicator.classList.add('active');
+      statusText.textContent = 'Recognition active';
+    }
+    
+    // Update UI based on the current state
+    function updateButtonState() {
+      if (state.isRunning) {
+        btnIcon.textContent = '⏹️';
+        btnText.textContent = 'Stop Recognition';
+        startBtn.style.backgroundColor = '#ef4444';
+      } else {
+        btnIcon.textContent = '▶️';
+        btnText.textContent = 'Start Recognition';
+        startBtn.style.backgroundColor = '';
+      }
+    }
+    
+    // Switch between raw webcam view and processed output
+    function toggleView() {
+      if (state.viewMode === 'raw') {
+        state.viewMode = 'processed';
+        video.style.display = 'none';
+        output.style.display = 'block';
+      } else {
+        state.viewMode = 'raw';
+        video.style.display = 'block';
+        output.style.display = 'none';
+      }
+    }
+    
+    // Toggle dark/light mode
+    function toggleDarkMode() {
+      state.isDarkMode = !state.isDarkMode;
+      document.body.classList.toggle('dark-mode', state.isDarkMode);
+      
+      if (state.isDarkMode) {
+        modeIcon.textContent = '☀️';
+        modeText.textContent = 'Light Mode';
+      } else {
+        modeIcon.textContent = '🌙';
+        modeText.textContent = 'Dark Mode';
+      }
+      
+      // Save preference
+      localStorage.setItem('darkMode', state.isDarkMode);
+    }
+    
+    // Check if user has a dark mode preference
+    function checkDarkModePreference() {
+      const savedPreference = localStorage.getItem('darkMode');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      
+      if (savedPreference === 'true' || (savedPreference === null && prefersDark)) {
+        state.isDarkMode = true;
+        document.body.classList.add('dark-mode');
+        modeIcon.textContent = '☀️';
+        modeText.textContent = 'Light Mode';
+      }
+    }
+    
+    // Capture and send video frame
+    async function sendFrame() {
+      if (!video.videoWidth) return;
+      
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      canvas.toBlob(async blob => {
+        const form = new FormData();
+        form.append('image', blob, 'frame.jpg');
+        
+        try {
+          statusText.textContent = 'Processing...';
+          
+          const res = await fetch(state.serverUrl, {
+            method: 'POST',
+            body: form
+          });
+          
+          if (!res.ok) {
+            throw new Error(`Server error: ${res.status}`);
+          }
+          
+          const data = await res.json();
+          
+          if (data.error) {
+            showError(`Server error: ${data.error}`);
+          } else {
+            // Reset error attempts on success
+            state.connectionAttempts = 0;
+            hideError();
+            
+            // Extract prediction and confidence if available
+            let prediction = data.prediction;
+            let confidence = data.confidence || 0;
+            
+            // Update prediction with animation
+            updatePrediction(prediction, confidence);
+            
+            // Update the processed image
+            if (data.image) {
+              output.src = 'data:image/jpeg;base64,' + data.image;
+            }
+            
+            statusText.textContent = 'Recognition active';
+          }
+        } catch (e) {
+          state.connectionAttempts++;
+          
+          if (state.connectionAttempts >= state.maxAttempts) {
+            showError(`Failed to connect to the server. Please check if the backend is running at ${state.serverUrl}`);
+          } else {
+            showError(`Connection attempt ${state.connectionAttempts}/${state.maxAttempts} failed. Retrying...`);
+          }
+          
+          console.error('Request error:', e);
+        }
+      }, 'image/jpeg', 0.9);
+    }
+    
+    // Update the prediction display with animation
+    function updatePrediction(prediction, confidence) {
+      if (prediction !== state.lastPrediction) {
+        predDiv.style.transform = 'translateY(-10px)';
+        predDiv.style.opacity = '0';
+        
+        setTimeout(() => {
+          predDiv.textContent = prediction;
+          
+          // Add to history if it's a valid prediction
+          if (prediction && prediction !== 'Unknown' && prediction !== 'Detecting...') {
+            addToHistory(prediction);
+          }
+          
+          predDiv.style.transform = 'translateY(0)';
+          predDiv.style.opacity = '1';
+        }, 200);
+        
+        state.lastPrediction = prediction;
+      }
+    }
+    
+    // Add prediction to history
+    function addToHistory(prediction) {
+      // Limit history size
+      if (state.predictionHistory.length >= 8) {
+        state.predictionHistory.shift();
+        
+        // Remove first child from DOM
+        if (historyContainer.children.length >= 8) {
+          historyContainer.removeChild(historyContainer.children[0]);
+        }
+      }
+      
+      // Add new prediction
+      state.predictionHistory.push(prediction);
+      
+      // Create new history item
+      const historyItem = document.createElement('div');
+      historyItem.className = 'history-item';
+      historyItem.textContent = prediction.charAt(0);
+      historyItem.title = prediction;
+      historyItem.style.animationDelay = `${state.predictionHistory.length * 0.05}s`;
+      
+      // Add to DOM
+      historyContainer.appendChild(historyItem);
+    }
+    
+    // Create empty history placeholders
+    function createEmptyHistory() {
+      for (let i = 0; i < 8; i++) {
+        const placeholder = document.createElement('div');
+        placeholder.className = 'history-item';
+        placeholder.style.opacity = '0.3';
+        placeholder.textContent = '?';
+        historyContainer.appendChild(placeholder);
+      }
+    }
+    
+    // Show error message
+    function showError(message) {
+      errorMsg.textContent = message;
+      errorMsg.style.display = 'block';
+      
+      // Clear previous timeout
+      if (state.errorTimeout) {
+        clearTimeout(state.errorTimeout);
+      }
+      
+      // Auto-hide after 5 seconds unless it's a critical error
+      if (!message.includes('Failed to connect')) {
+        state.errorTimeout = setTimeout(() => {
+          hideError();
+        }, 5000);
+      }
+    }
+    
+    // Hide error message
+    function hideError() {
+      errorMsg.style.display = 'none';
+    }
+    
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
